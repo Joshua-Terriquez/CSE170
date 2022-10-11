@@ -92,13 +92,6 @@ float R = 1.0f, r = 0.5f;
 
 vector<float>torus_vertices;
 
-void glutSolidTorus(GLdouble innerRadius, GLdouble outerRadius, GLint nsides, GLint rings) {
-	
-}
-void print2() {
-	glutSolidTorus(0.5F,1.0f,32,32);
-};
-
 class torus {
 	public:
 
@@ -238,7 +231,7 @@ void CreateAxisBuffers( void )
 void CreateTorusBuffers(void)
 {
 	//print();
-	print2();
+	//print2();
 
 	glGenVertexArrays(1, &torus_VAO);
 	glBindVertexArray(torus_VAO);
