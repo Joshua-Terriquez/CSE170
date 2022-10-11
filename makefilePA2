@@ -1,0 +1,31 @@
+#Tyler Armstrong
+#sept 28, 2022
+#CSE170 PA2
+CC = g++ -std=c++17
+inc = -I ../../glm/ -I ../../freeglut/include/
+file = main.cpp shader.cpp shaderprogram.cpp
+lib = -L ../../freeglut/lib/x64/
+exe = project.exe
+
+ifdef OS
+	link = -lopengl32 -static -lglew32.dll -static -lfreeglut.dll -o
+else
+   ifeq ($(shell uname), Linux)
+		link = -lGL -lGLEW -lglut -o
+   endif
+endif
+
+all:
+	$(CC) $(inc) $(file) $(lib) $(link) $(exe)
+
+debug: #for debugging with gdb
+	g++ -g $(exe) -o broken
+
+debugtest: #run gdb
+	gdb broken
+
+run: 
+	./$(exe)
+
+clean:
+	rm -f $(exe)
