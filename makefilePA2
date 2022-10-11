@@ -1,5 +1,4 @@
-#Tyler Armstrong
-#sept 28, 2022
+
 #CSE170 PA2
 CC = g++ -std=c++17
 inc = -I ../../glm/ -I ../../freeglut/include/
