@@ -152,7 +152,7 @@ class torus {
 			*/
 }; torus T;
 
-void print() {
+void print() { // this was also made.
 	T.torus_param(R, r, n, s);
 	int count = 0;
 	
@@ -480,7 +480,7 @@ int main( int argc, char** argv )
 
 	init();
 
-	print();
+	//print();
 
 	glutMainLoop();
 
