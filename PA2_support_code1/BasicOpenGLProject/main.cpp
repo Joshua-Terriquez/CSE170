@@ -68,7 +68,7 @@ GLuint axis_VBO[2];
 
 float R = 1.f;
 float r = 0.2f;
-int N = 32, M = 16;
+int N = 8, M = 60;
 
 vector<float> verts;
 // bool updateFlag = true;
@@ -78,14 +78,14 @@ struct Point {
 };
 
 
-float PI = 3.1415;
+float PI = 3.1416;
 
-vector<float> constructTorus() { //float R, float r, int N, int M) {
+vector<float> constructTorus(float R,float r,int N, int M) { //float R, float r, int N, int M) {
 	std::vector<float> points;
 	for (int i = 0; i < N; ++i) {
 		for (int j = 0; j < M; ++j) {
 
-			auto makePoint = [&](int i, int j) {
+			auto makePoint = [&](int i, int j) { //capture all variables within scope by reference
 				Point P;
 				float theta = 2 * PI * i / (float)N;
 				float phi = 2 * PI * j / (float)M;
@@ -122,7 +122,7 @@ vector<float> constructTorus() { //float R, float r, int N, int M) {
 
 
 
-float axis_vertices[] = {
+/*float axis_vertices[] = {
 	//x axis
 	-1.0f,  0.0f,  0.0f, 1.0f,
 	1.0f,  0.0f,  0.0f, 1.0f,
@@ -148,7 +148,7 @@ float axis_colors[] = {
 	0.0f, 0.0f, 1.0f, 1.0f,
 	0.0f, 0.0f, 1.0f, 1.0f
 };
-
+*/
 /*=================================================================================================
 	HELPER FUNCTIONS
 =================================================================================================*/
@@ -202,7 +202,7 @@ void CreateShaders(void)
 void CreateAxisBuffers(void)
 {
 
-	verts = constructTorus(); // 1.0f, 0.1f, N, M);
+	verts = constructTorus( R,  r,  N, M); // 1.0f, 0.1f, N, M);
 
 
 	glGenVertexArrays(1, &axis_VAO);
