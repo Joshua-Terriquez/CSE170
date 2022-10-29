@@ -1,16 +1,19 @@
 #include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <glm/glm.hpp>
+#include <iostream>
 #include <glm/ext.hpp>
 #include <vector>
-#include <iostream>
 #include "shader.h"
 #include "shaderprogram.h"
 using namespace std;
-
+using namespace glm;
 /*=================================================================================================
 	DOMAIN
 =================================================================================================*/
+
+int FLAT_MODE = true;
+bool NORMAL_VISIBLE = true;
 
 // Window dimensions
 const int InitWindowWidth = 800;
@@ -36,13 +39,10 @@ bool draw_wireframe = false;
 
 ShaderProgram PassthroughShader;
 ShaderProgram PerspectiveShader;
-// 2 shaders added 
-ShaderProgram SmoothShader;
-ShaderProgram NotSmoothShader;
 
 glm::mat4 PerspProjectionMatrix(1.0f);
 glm::mat4 PerspViewMatrix(1.0f);
-glm::mat4 PerspModelMatrix(1.0f);
+glm::mat4 PerspNormalMatrix(1.0f);
 
 float perspZoom = 1.0f, perspSensitivity = 0.35f;
 float perspRotationX = 0.0f, perspRotationY = 0.0f;
@@ -128,17 +128,17 @@ float r = 0.1f; //Innner Radius
 int N = 8, M = 10;//M sides & N= number of triangles
 
 vector<float> verts; // this stores all of torus in the end
-vector<float> norms;
+vector<float> norms, verts_norm;
 // bool updateFlag = true;
 
 struct Point {  //point struct
 	float x = 0, y = 0, z = 0, w = 1;
 };
 
-
 float PI = 3.1416F;
-vector<float> constructTorus(float R,float r,int N,int M) { //return a vector of type float
-	std::vector<float> points,normalPoints;  //initialize a vector of type float name points.
+
+vector<float> constructTorus(float R, float r, int N, int M) { //return a vector of type float
+	std::vector<float> points, normalPoints;  //initialize a vector of type float name points.
 	for (int i = 0; i < N; ++i) {  //num of triangles 
 		for (int j = 0; j < M; ++j) { //sides
 
@@ -152,14 +152,14 @@ vector<float> constructTorus(float R,float r,int N,int M) { //return a vector of
 				P.z = r * sin(theta);
 				return P;
 			};
-		
+
 			Point P = makePoint(i, j);             //points to connect two tri's
-			Point Q = makePoint(i, j + 1);          
+			Point Q = makePoint(i, j + 1);
 			Point R = makePoint(i + 1, j + 1);
 			Point S = makePoint(i + 1, j);
 
 			auto add = [&](Point w) {  // construct for add essentially to connect two tri's
-				points.push_back(w.x);      
+				points.push_back(w.x);
 				points.push_back(w.y);// this is a add method for connecting all the sides
 				points.push_back(w.z);
 				points.push_back(1);
@@ -173,67 +173,149 @@ vector<float> constructTorus(float R,float r,int N,int M) { //return a vector of
 
 		}
 	}
-	return points;// , normalPoints; //returns to display
+	return points; //returns to display
 }
-vector<float> ConstructNorms(int N,int M) {
+vector<float> ConstructNorms(int N, int M) {
 	std::vector<float> normalPoints;  //initialize a vector of type float named ...
 
 	for (int i = 0; i < N; ++i) {  //num of triangles 
 		for (int j = 0; j < M; ++j) { //sides
-			//computes normals
-			auto makeNormals = [&](int i, int j) {
-				Point Normals;
-				float theta = 2 * PI * i / (float)N;
-				float phi = 2 * PI * j / (float)M;
-				Normals.x = (cos(theta) * cos(phi));
-				Normals.y = (cos(theta) * sin(phi));
-				Normals.z = (sin(theta));
-				return Normals;
-			};
-			Point n = makeNormals(i, j);
-			Point o = makeNormals(i, j + 1);
-			Point r = makeNormals(i + 1, j + 1);
-			Point m = makeNormals(i + 1, j);
-			// adds normals
-			auto addNormals = [&](Point n) {
-				normalPoints.push_back(n.x);
-				normalPoints.push_back(n.y);
-				normalPoints.push_back(n.z);
-				normalPoints.push_back(1);
+			if (FLAT_MODE) {
+				auto makePoint = [&](int i, int j) { // //capture all variables within scope by reference
+					Point P; // initialize/ create point p
+					float theta = 2 * PI * i / (float)N;
+					float phi = 2 * PI * j / (float)M; //convert theta and phi to radians
 
-			};
-			addNormals(n); addNormals(o); addNormals(r);
-			addNormals(r); addNormals(m); addNormals(n);
+					P.x = (R + r * cos(theta)) * cos(phi);   //paramaterization
+					P.y = (R + r * cos(theta)) * sin(phi);     //for points
+					P.z = r * sin(theta);
+					return P;
+				};
+				; Point p = makePoint(i, j);             //points to connect two tri's
+				Point q = makePoint(i, j + 1);
+				Point r = makePoint(i + 1, j + 1);
+				Point s = makePoint(i + 1, j);
+
+				glm:: vec3 P(p.x, p.y, p.z), Q(q.x, q.y, q.z), R(r.x, r.y, r.z);
+				glm:: vec3 norm = glm::cross(Q - P, R - P);
+				norm = glm::normalize(norm) * 0.05f;
+
+				for (int i = 0; i < 6; ++i) {
+					normalPoints.push_back(norm.x);
+					normalPoints.push_back(norm.y);
+					normalPoints.push_back(norm.z);
+					normalPoints.push_back(0);
+				}
+			}
+			else {
+				//computes normals
+				auto makeNormals = [&](int i, int j) {
+					Point Normals;
+					float theta = 2 * PI * i / (float)N;
+					float phi = 2 * PI * j / (float)M;
+					Normals.x = (cos(theta) * cos(phi));
+					Normals.y = (cos(theta) * sin(phi));
+					Normals.z = (sin(theta));
+					return Normals;
+				};
+				Point n = makeNormals(i, j);
+				Point o = makeNormals(i, j + 1);
+				Point r = makeNormals(i + 1, j + 1);
+				Point m = makeNormals(i + 1, j);
+				// adds normals
+				auto addNormals = [&](Point n) {
+					normalPoints.push_back(n.x);
+					normalPoints.push_back(n.y);
+					normalPoints.push_back(n.z);
+					normalPoints.push_back(0);
+				};
+				addNormals(n); addNormals(o); addNormals(r);
+				addNormals(r); addNormals(m); addNormals(n);
+			}
 		}
 	}
 	return normalPoints;
 }
-float axis_vertices[] = {
-	//x axis
-	-1.0f,  0.0f,  0.0f, 1.0f,
-	1.0f,  0.0f,  0.0f, 1.0f,
-	//y axis
-	0.0f, -1.0f,  0.0f, 1.0f,
-	0.0f,  1.0f,  0.0f, 1.0f,
-	//z axis
-	0.0f,  0.0f, -1.0f, 1.0f,
-	0.0f,  0.0f,  1.0f, 1.0f
-};
+
+vector<float> ConstructNormVectors(float R, float r, int N, int M)
+{
+	std::vector<float> points;  //initialize a vector of type float name points.
+	for (int i = 0; i < N; ++i) {  //num of triangles 
+		for (int j = 0; j < M; ++j) { //sides
+
+			auto makePoint = [&](int i, int j) { // //capture all variables within scope by reference
+				Point P; // initialize/ create point p
+				float theta = 2 * PI * i / (float)N;
+				float phi = 2 * PI * j / (float)M; //convert theta and phi to radians
+
+				P.x = (R + r * cos(theta)) * cos(phi);   //paramaterization
+				P.y = (R + r * cos(theta)) * sin(phi);     //for points
+				P.z = r * sin(theta);
+				return P;
+			};
+
+			if (FLAT_MODE) {
+
+				Point P = makePoint(i, j);             //points to connect two tri's
+				Point Q = makePoint(i, j + 1);
+				Point R = makePoint(i + 1, j + 1);
+				Point S = makePoint(i + 1, j);
+
+				auto add = [&](Point p, Point q, Point r) {  // construct for add essentially to connect two tri's
+					glm::vec3 P(p.x, p.y, p.z), Q(q.x, q.y, q.z), R(r.x, r.y, r.z);
+					glm::vec3 C = (P + Q + R) / 3.0f;
+
+					points.push_back(C[0]);
+					points.push_back(C[1]);
+					points.push_back(C[2]);
+					points.push_back(1);
+
+					glm::vec3 norm = glm::cross(Q - P, R - P);
+					norm = glm::normalize(norm) * 0.05f;
+
+					points.push_back(C[0] + norm[0]);
+					points.push_back(C[1] + norm[1]);
+					points.push_back(C[2] + norm[2]);
+					points.push_back(1);
+				};
+				add(P, Q, R);
+				add(R, S, P);
+			}
+			else {
+				Point P = makePoint(i, j);             //points to connect two tri's
+				Point Q = makePoint(i, j + 1);
+
+				auto add = [&](Point p, int i, int j) {  // construct for add essentially to connect two tri's
+					glm::vec3 P(p.x, p.y, p.z);
+
+					points.push_back(P[0]);
+					points.push_back(P[1]);
+					points.push_back(P[2]);
+					points.push_back(1);
 
 
+					float theta = 2 * PI * i / (float)N;
+					float phi = 2 * PI * j / (float)M; //convert theta and phi to radians
 
+					glm::vec3 norm;
+					norm.x = (cos(theta) * cos(phi));
+					norm.y = (cos(theta) * sin(phi));
+					norm.z = (sin(theta));
+					norm = glm::normalize(norm) * 0.05f;
 
-float axis_colors[] = {
-	//x axis
-	1.0f, 0.0f, 0.0f, 1.0f,
-	1.0f, 0.0f, 0.0f, 1.0f,
-	//y axis
-	0.0f, 1.0f, 0.0f, 1.0f,
-	0.0f, 1.0f, 0.0f, 1.0f,
-	//z axis
-	0.0f, 0.0f, 1.0f, 1.0f,
-	0.0f, 0.0f, 1.0f, 1.0f
-};
+					points.push_back(P[0] + norm[0]);
+					points.push_back(P[1] + norm[1]);
+					points.push_back(P[2] + norm[2]);
+					points.push_back(1);
+				};
+				add(P, i, j);
+				add(Q, i, j + 1);
+			}
+		}
+	}
+	return points; //returns to display
+}
+
 
 /*=================================================================================================
 	HELPER FUNCTIONS
@@ -249,6 +331,8 @@ void window_to_scene(int wx, int wy, float& sx, float& sy)
 	SHADERS
 =================================================================================================*/
 
+
+
 void CreateTransformationMatrices(void)
 {
 	// PROJECTION MATRIX
@@ -261,11 +345,16 @@ void CreateTransformationMatrices(void)
 
 	PerspViewMatrix = glm::lookAt(eye, center, up);
 
-	// MODEL MATRIX
-	PerspModelMatrix = glm::mat4(1.0);
+	glm::mat4 PerspModelMatrix = glm::mat4(1.0);
 	PerspModelMatrix = glm::rotate(PerspModelMatrix, glm::radians(perspRotationX), glm::vec3(1.0, 0.0, 0.0));
 	PerspModelMatrix = glm::rotate(PerspModelMatrix, glm::radians(perspRotationY), glm::vec3(0.0, 1.0, 0.0));
 	PerspModelMatrix = glm::scale(PerspModelMatrix, glm::vec3(perspZoom));
+
+	PerspectiveShader.SetUniform("projectionMatrix", glm::value_ptr(PerspProjectionMatrix), 4, GL_FALSE, 1);
+	PerspectiveShader.SetUniform("viewMatrix", glm::value_ptr(PerspViewMatrix), 4, GL_FALSE, 1);
+	PerspectiveShader.SetUniform("modelMatrix", glm::value_ptr(PerspModelMatrix), 4, GL_FALSE, 1);
+
+	
 }
 
 void CreateShaders(void)
@@ -276,14 +365,10 @@ void CreateShaders(void)
 	cout << "B" << endl;
 
 	// Renders using perspective projection
-	PerspectiveShader.Create("./shaders/persp.vert", "./shaders/persp.frag");
+	PerspectiveShader.Create("./shaders/persplight.vert", "./shaders/persplight.frag");
 	
-	//PerspectiveShader.Create("./shaders/persplight.vert","./shaders/persplight.frag");
 	cout << "C" << endl;
-	// I added this
-//	SmoothShader.Create("./shaders/smooth.vert", "./shaders/smooth.frag");
-//	NotSmoothShader.Create("./shaders/not_smooth.vert", "./shaders/not_smooth.frag");
-
+	
 
 
 }
@@ -295,43 +380,65 @@ void CreateShaders(void)
 
 void CreateAxisBuffers(void)
 {
-	//norms = ConstructNorms(N,M);
-	verts = constructTorus(R,r,N,M); // 1.0f, 0.1f, N, M);
+	norms = ConstructNorms(N, M);
+	verts = constructTorus(R, r, N, M); // 1.0f, 0.1f, N, M);
+	verts_norm = ConstructNormVectors(R, r, N, M);
 	//verts = generateTorusVertices( R,  r,  N,  M); 
+	vector<float> rgb;
+
 	glGenVertexArrays(1, &axis_VAO);
 	glBindVertexArray(axis_VAO);
 
-	glGenBuffers(2, &axis_VBO[0]);
-
+	glGenBuffers(3, &axis_VBO[0]);
 	glBindBuffer(GL_ARRAY_BUFFER, axis_VBO[0]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * verts.size(), &verts[0], GL_STATIC_DRAW);
-    
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray(0);
-	 /*
-	glGenVertexArrays(1, &norms_VAO);
-	glBindVertexArray(norms_VAO);
-	glGenBuffers(2, &norms_VBO[0]);
-	glBindBuffer(GL_ARRAY_BUFFER, norms_VBO[0]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * norms.size(), &norms[0], GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-	*/
-	vector<float> rgb;
+
 	// created a vector type float rgb
-	for (auto v: verts) { // goes through the entire vector and fills
-		
+	for (auto v : verts) { // goes through the entire vector and fills
+
 		rgb.push_back(0.f);
-		rgb.push_back(66.f);
-		rgb.push_back(255.f);
+		rgb.push_back(0.2f);
+		rgb.push_back(0.5f);
 		rgb.push_back(1.f);
-		
+
 	}
 
 	glBindBuffer(GL_ARRAY_BUFFER, axis_VBO[1]);
 	// size is equal to amount of verts 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * rgb.size(), &rgb[0], GL_STATIC_DRAW);
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glEnableVertexAttribArray(1);
+
+	glBindBuffer(GL_ARRAY_BUFFER, axis_VBO[2]);
+	// size is equal to amount of verts 
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * norms.size(), &norms[0], GL_STATIC_DRAW);
+	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glEnableVertexAttribArray(2);
+
+	glGenVertexArrays(1, &norms_VAO);
+	glBindVertexArray(norms_VAO);
+
+	glGenBuffers(2, &norms_VBO[0]);
+	glBindBuffer(GL_ARRAY_BUFFER, norms_VBO[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * verts_norm.size(), &verts_norm[0], GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glEnableVertexAttribArray(0);
+
+	rgb.clear();
+	for (int i = 0, n = verts_norm.size() / 4; i < n; ++i) {
+		rgb.push_back(1.f);
+		rgb.push_back(0.f);
+		rgb.push_back(0.f);
+		rgb.push_back(1.f);
+	}
+
+	glBindBuffer(GL_ARRAY_BUFFER, norms_VBO[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * rgb.size(), &rgb[0], GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray(1);
 
 	glBindVertexArray(0);
@@ -382,29 +489,29 @@ void keyboard_func(unsigned char key, int x, int y)
 		CreateAxisBuffers();
 		break;
 	}
-	case 'a':{
+	case 'a': {
 		--N;    //dec. num tri's
 		CreateAxisBuffers();
 		break;
-			}
-	
+	}
+
 	case 'w': {
 		r += 0.1f; //INCREMENTS LIL r
 		CreateAxisBuffers();
 		break;
 	}
 	case 's': {
-		r -=0.1F;  //DEC LIL r
+		r -= 0.1F;  //DEC LIL r
 		CreateAxisBuffers();
 		break;
 	}
 	case 'e': {
-		R+=0.1f;  //INC R
+		R += 0.1f;  //INC R
 		CreateAxisBuffers();
-		break; 
+		break;
 	}
 	case 'd': {
-		R-=0.1f; //DECREMENTS R
+		R -= 0.1f; //DECREMENTS R
 		CreateAxisBuffers();
 		break;
 	}
@@ -418,6 +525,17 @@ void keyboard_func(unsigned char key, int x, int y)
 		CreateAxisBuffers();
 		break;
 		// Exit on escape key press
+	case 'c':
+		NORMAL_VISIBLE = !NORMAL_VISIBLE;
+		break;
+	case 'z':
+		FLAT_MODE = true;
+		CreateAxisBuffers();
+		break;
+	case 'x':
+		FLAT_MODE = false;
+		CreateAxisBuffers();
+		break;
 	case '\x1B':
 	{
 		exit(EXIT_SUCCESS);
@@ -509,27 +627,25 @@ void display_func(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	PerspectiveShader.Use();
 	CreateTransformationMatrices();
 
-	PerspectiveShader.Use();
-	PerspectiveShader.SetUniform("projectionMatrix", glm::value_ptr(PerspProjectionMatrix), 4, GL_FALSE, 1);
-	PerspectiveShader.SetUniform("viewMatrix", glm::value_ptr(PerspViewMatrix), 4, GL_FALSE, 1);
-	PerspectiveShader.SetUniform("modelMatrix", glm::value_ptr(PerspModelMatrix), 4, GL_FALSE, 1);
 
 	if (draw_wireframe == true)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	glBindVertexArray(axis_VAO);
 	glDrawArrays(GL_TRIANGLES, 0, verts.size());
-
-	glBindVertexArray(0);
-
-	glBindVertexArray(norms_VAO);
-	glDrawArrays(GL_LINES, 0, norms.size());
 	glBindVertexArray(0);
 
 	if (draw_wireframe == true)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	if (NORMAL_VISIBLE) {
+		glBindVertexArray(norms_VAO);
+		glDrawArrays(GL_LINES, 0, verts_norm.size());
+		glBindVertexArray(0);
+	}
 
 	glutSwapBuffers();
 }
@@ -599,4 +715,3 @@ int main(int argc, char** argv)
 
 	return EXIT_SUCCESS;
 }
-
