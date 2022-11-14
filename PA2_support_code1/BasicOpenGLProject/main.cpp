@@ -1,11 +1,20 @@
+
 #include <GL/glew.h>
 #include <GL/freeglut.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
 #include <glm/glm.hpp>
 #include <iostream>
 #include <glm/ext.hpp>
 #include <vector>
+//#define GLFW_INCLUDE_NONE
+//#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+
+
 #include "shader.h"
 #include "shaderprogram.h"
+#include "stb_image.h"
 using namespace std;
 using namespace glm;
 /*=================================================================================================
@@ -60,7 +69,6 @@ GLuint norms_VBO[4];
 
 /*float R = 1.0f, r = 0.25f;
 int N = 20, M = 10;
-
 struct Vertex {
 	float x = 0, y = 0, z = 0, w = 1;
 	Vertex(float _x, float _y, float _z) : x(_x), y(_y), z(_z) { }
@@ -68,29 +76,23 @@ struct Vertex {
 		ptr[0] = x;  ptr[1] = y;  ptr[2] = z;  ptr[3] = 1;
 	}
 };
-
-
 float PI = 3.14159265358979323846F;
 float TAU = 2 * PI;
 std::vector<float> verts(N* M * 6 * 4);
 vector<float> generateTorusVertices(float R, float r, int N, int M) {
 	std::vector<float> verts(N * M * 6 * 4);  // xyzw for the 3 points of 2 triangles for each (i, j) torus location
 	int k = 0;  // index to verts
-
 	for (int i = 0; i < N; ++i) {
 		for (int j = 0; j < M; ++j) {
-
 			auto vertex_at = [&](int i, int j) -> Vertex {
 				float theta = TAU * i / (float)N,
 					phi = TAU * j / (float)M;
-
 				return {
 					(R + r * cos(theta)) * cos(phi),
 					(R + r * cos(theta)) * sin(phi),
 					r * sin(theta)
 				};
 			};
-
 			// make quad
 			vector<Vertex> corners = {
 				vertex_at(i, j),
@@ -98,7 +100,6 @@ vector<float> generateTorusVertices(float R, float r, int N, int M) {
 				vertex_at(i + 1, j + 1),
 				vertex_at(i + 1, j)
 			};
-
 			// split quad into 2 triangles & store
 			for (int index : {0, 1, 2, 2, 3, 1}) {
 				corners[index].store_at(&verts[k]);
@@ -196,8 +197,8 @@ vector<float> ConstructNorms(int N, int M) {
 				Point r = makePoint(i + 1, j + 1);
 				Point s = makePoint(i + 1, j);
 
-				glm:: vec3 P(p.x, p.y, p.z), Q(q.x, q.y, q.z), R(r.x, r.y, r.z);
-				glm:: vec3 norm = glm::cross(Q - P, R - P);
+				glm::vec3 P(p.x, p.y, p.z), Q(q.x, q.y, q.z), R(r.x, r.y, r.z);
+				glm::vec3 norm = glm::cross(Q - P, R - P);
 				norm = glm::normalize(norm) * 0.05f;
 
 				for (int i = 0; i < 6; ++i) {
@@ -317,6 +318,47 @@ vector<float> ConstructNormVectors(float R, float r, int N, int M)
 }
 
 
+void textures() { 
+	//Texture 
+//three int vars to store width, height, number of color channels
+	int widthImg, heightImg, numColCh;
+	stbi_set_flip_vertically_on_load(true);
+	// stores the image itself 
+	unsigned char* bytes = stbi_load("TorusTexturePic1.jpg", &widthImg, &heightImg, &numColCh, 0);
+	//reference var
+	GLuint texture;
+	//glGenTextures to generate the texture object giving it number of textures
+	// and the pointer to the reference variable.
+	glGenTextures(1, &texture);
+	//To insert texture in the slot of a texture unit simply need to activate
+	//texture. GL_texture0-Gl_texture3
+	glActiveTexture(GL_TEXTURE0);
+	//binding- inserting the texture type, and its reference value
+	glBindTexture(GL_TEXTURE_2D, texture);
+	// function to tweak our texture settings, and input the type of texture,
+	//setting to modify and value we want to leave our setting
+	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	//generates the texture: type of texture,0,type of color channels,
+	//width , height, 0 , and type of color channels img has, data type of pixels
+	// image data itself.
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, widthImg, heightImg, 0, GL_RGBA, GL_UNSIGNED_BYTE, bytes);
+	// smaller resolutions when texture is far away
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	// delete data
+	stbi_image_free(bytes);
+	//unbinds texture
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	GLuint tex0uni = glGetUniformLocation(shaderProgram.ID, "texId");
+	shaderProgram.Activate();
+	glUniform1i(tex0Uni, 0);
+}
 /*=================================================================================================
 	HELPER FUNCTIONS
 =================================================================================================*/
@@ -354,7 +396,7 @@ void CreateTransformationMatrices(void)
 	PerspectiveShader.SetUniform("viewMatrix", glm::value_ptr(PerspViewMatrix), 4, GL_FALSE, 1);
 	PerspectiveShader.SetUniform("modelMatrix", glm::value_ptr(PerspModelMatrix), 4, GL_FALSE, 1);
 
-	
+
 }
 
 void CreateShaders(void)
@@ -363,13 +405,12 @@ void CreateShaders(void)
 	// Renders without any transformations
 	PassthroughShader.Create("./shaders/simple.vert", "./shaders/simple.frag");
 	cout << "B" << endl;
-
 	// Renders using perspective projection
 	PerspectiveShader.Create("./shaders/persplight.vert", "./shaders/persplight.frag");
-	
-	cout << "C" << endl;
-	
 
+	cout << "C" << endl;
+
+	
 
 }
 
@@ -388,24 +429,20 @@ void CreateAxisBuffers(void)
 
 	glGenVertexArrays(1, &axis_VAO);
 	glBindVertexArray(axis_VAO);
-
 	glGenBuffers(3, &axis_VBO[0]);
 	glBindBuffer(GL_ARRAY_BUFFER, axis_VBO[0]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * verts.size(), &verts[0], GL_STATIC_DRAW);
-
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray(0);
 
 	// created a vector type float rgb
 	for (auto v : verts) { // goes through the entire vector and fills
-
 		rgb.push_back(0.f);
 		rgb.push_back(0.2f);
 		rgb.push_back(0.5f);
 		rgb.push_back(1.f);
 
 	}
-
 	glBindBuffer(GL_ARRAY_BUFFER, axis_VBO[1]);
 	// size is equal to amount of verts 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * rgb.size(), &rgb[0], GL_STATIC_DRAW);
@@ -420,11 +457,9 @@ void CreateAxisBuffers(void)
 
 	glGenVertexArrays(1, &norms_VAO);
 	glBindVertexArray(norms_VAO);
-
 	glGenBuffers(2, &norms_VBO[0]);
 	glBindBuffer(GL_ARRAY_BUFFER, norms_VBO[0]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * verts_norm.size(), &verts_norm[0], GL_STATIC_DRAW);
-
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray(0);
 
@@ -440,6 +475,11 @@ void CreateAxisBuffers(void)
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * rgb.size(), &rgb[0], GL_STATIC_DRAW);
 	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray(1);
+
+	glBindBuffer(GL_ARRAY_BUFFER, norms_VBO[2]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * verts_norm.size(), verts_norm.data(), GL_STATIC_DRAW);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), (void*)0);
+	glEnableVertexAttribArray(2);
 
 	glBindVertexArray(0);
 }
