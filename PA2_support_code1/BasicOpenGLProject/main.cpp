@@ -8,7 +8,6 @@
 #include <iostream>
 #include <glm/ext.hpp>
 #include <vector>
-
 #include <GLFW/glfw3.h>
 
 
@@ -66,63 +65,6 @@ GLuint axis_VBO[4];
 
 GLuint norms_VAO;
 GLuint norms_VBO[4];
-
-/*float R = 1.0f, r = 0.25f;
-int N = 20, M = 10;
-struct Vertex {
-	float x = 0, y = 0, z = 0, w = 1;
-	Vertex(float _x, float _y, float _z) : x(_x), y(_y), z(_z) { }
-	void store_at(float* ptr) {
-		ptr[0] = x;  ptr[1] = y;  ptr[2] = z;  ptr[3] = 1;
-	}
-};
-float PI = 3.14159265358979323846F;
-float TAU = 2 * PI;
-std::vector<float> verts(N* M * 6 * 4);
-vector<float> generateTorusVertices(float R, float r, int N, int M) {
-	std::vector<float> verts(N * M * 6 * 4);  // xyzw for the 3 points of 2 triangles for each (i, j) torus location
-	int k = 0;  // index to verts
-	for (int i = 0; i < N; ++i) {
-		for (int j = 0; j < M; ++j) {
-			auto vertex_at = [&](int i, int j) -> Vertex {
-				float theta = TAU * i / (float)N,
-					phi = TAU * j / (float)M;
-				return {
-					(R + r * cos(theta)) * cos(phi),
-					(R + r * cos(theta)) * sin(phi),
-					r * sin(theta)
-				};
-			};
-			// make quad
-			vector<Vertex> corners = {
-				vertex_at(i, j),
-				vertex_at(i, j + 1),
-				vertex_at(i + 1, j + 1),
-				vertex_at(i + 1, j)
-			};
-			// split quad into 2 triangles & store
-			for (int index : {0, 1, 2, 2, 3, 1}) {
-				corners[index].store_at(&verts[k]);
-				k += 4;
-			}
-		}
-	}
-	return verts;
-}*/
-
-// vector<float> vert0 = {
-// 	//x axis
-// 	-1.0f,  0.0f,  1.0f, 1.0f,
-// 	1.0f,  0.0f,  0.0f, 1.0f,
-// 	//y axis
-// 	0.0f, -1.0f,  0.0f, 1.0f,
-// 	0.0f,  1.0f,  0.0f, 1.0f,
-// 	//z axis
-// 	0.0f,  0.0f, -1.0f, 1.0f,
-// 	0.0f,  0.0f,  1.0f, 1.0f
-// };
-
-// auto verts = constructTorus(1.0f, 0.1f, 16, 16);
 
 float R = .5f; //Big Radius
 float r = 0.1f; //Innner Radius
