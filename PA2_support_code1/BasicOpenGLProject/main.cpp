@@ -47,6 +47,7 @@ bool draw_wireframe = false;
 
 ShaderProgram PassthroughShader;
 ShaderProgram PerspectiveShader;
+ShaderProgram TextureShader;
 
 glm::mat4 PerspProjectionMatrix(1.0f);
 glm::mat4 PerspViewMatrix(1.0f);
@@ -71,7 +72,7 @@ float r = 0.1f; //Innner Radius
 int N = 8, M = 10;//M sides & N= number of triangles
 
 vector<float> verts; // this stores all of torus in the end
-vector<float> norms, verts_norm;
+vector<float> norms, verts_norm, tex_coords;
 // bool updateFlag = true;
 
 struct Point {  //point struct
@@ -180,6 +181,39 @@ vector<float> ConstructNorms(int N, int M) {
 	return normalPoints;
 }
 
+vector<float> ConstructTexCoords(int N, int M) {
+	std::vector<float> tex_coords;  
+
+	for (int i = 0; i < N; ++i) {  //num of triangles 
+		for (int j = 0; j < M; ++j) { //sides
+			// add texture coordinates. - (x, y) format
+			// first triangle
+			tex_coords.push_back((GLfloat)i / N);
+			tex_coords.push_back((GLfloat)j / M);
+
+			tex_coords.push_back((GLfloat)i / N);
+			tex_coords.push_back((GLfloat)(j + 1) / M);
+
+			tex_coords.push_back((GLfloat)(i + 1) / N);
+			tex_coords.push_back((GLfloat)(j + 1) / M);
+
+			// second triangle
+			tex_coords.push_back((GLfloat)(i + 1) / N);
+			tex_coords.push_back((GLfloat)(j + 1) / M);
+
+			tex_coords.push_back((GLfloat)(i + 1) / N);
+			tex_coords.push_back((GLfloat)j / M);
+
+			tex_coords.push_back((GLfloat)i / N);
+			tex_coords.push_back((GLfloat)j / M);
+		}
+	}
+	// this is for mirroring images - converting (0, 1) -> (-1, 1)
+	for (int i = 0; i < tex_coords.size(); ++i)
+		tex_coords[i] = tex_coords[i] * 2 - 1;
+	return tex_coords;
+}
+
 vector<float> ConstructNormVectors(float R, float r, int N, int M)
 {
 	std::vector<float> points;  //initialize a vector of type float name points.
@@ -260,48 +294,46 @@ vector<float> ConstructNormVectors(float R, float r, int N, int M)
 }
 
 
-void textures() { 
-	//Texture 
-//three int vars to store width, height, number of color channels
-	int widthImg, heightImg, numColCh;
+GLuint g_texId = 0;
+GLuint texture[3];
+void CreateTextures(){
 	stbi_set_flip_vertically_on_load(true);
-	// stores the image itself 
-	unsigned char* bytes = stbi_load("TorusTexturePic1.jpg", &widthImg, &heightImg, &numColCh, 0);
-	//reference var
-	GLuint texture;
-	//glGenTextures to generate the texture object giving it number of textures
-	// and the pointer to the reference variable.
-	glGenTextures(1, &texture);
-	//To insert texture in the slot of a texture unit simply need to activate
-	//texture. GL_texture0-Gl_texture3
+
+	// generate 3 textures.
+	glGenTextures(3, texture);
 	glActiveTexture(GL_TEXTURE0);
-	//binding- inserting the texture type, and its reference value
-	glBindTexture(GL_TEXTURE_2D, texture);
-	// function to tweak our texture settings, and input the type of texture,
-	//setting to modify and value we want to leave our setting
-	
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	for (int i = 0; i < 3; ++i) {
+		// load image like 1.png, 2.png ...
+		char imgpath[256];
+		sprintf_s(imgpath, "%d.png", i + 1);
+		int widthImg, heightImg, numColCh;
+		unsigned char* bytes = stbi_load(imgpath, &widthImg, &heightImg, &numColCh, 0);
+		// bind texture
+		glBindTexture(GL_TEXTURE_2D, texture[i]);
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	//generates the texture: type of texture,0,type of color channels,
-	//width , height, 0 , and type of color channels img has, data type of pixels
-	// image data itself.
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, widthImg, heightImg, 0, GL_RGBA, GL_UNSIGNED_BYTE, bytes);
-	// smaller resolutions when texture is far away
-	glGenerateMipmap(GL_TEXTURE_2D);
+		// this is parameter for scaling images - simple method (nearest)
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	// delete data
-	stbi_image_free(bytes);
-	//unbinds texture
-	glBindTexture(GL_TEXTURE_2D, 0);
+		// mirroring texture settings
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 
-	/*GLuint tex0uni = glGetUniformLocation(shaderProgram.ID, "texId");
-	shaderProgram.Activate();
-	glUniform1i(tex0Uni, 0);
-	*/
+		// generates the texture using image bytes
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, widthImg, heightImg, 0, GL_RGBA, GL_UNSIGNED_BYTE, bytes);
+
+		// smaller resolutions when texture is far away
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		// delete data
+		stbi_image_free(bytes);
+		//unbinds texture
+		glBindTexture(GL_TEXTURE_2D, 0);
 	}
+	// set shader program's textureId
+	TextureShader.Use();
+	TextureShader.SetUniform("texId", 0);
+}
 /*=================================================================================================
 	HELPER FUNCTIONS
 =================================================================================================*/
@@ -335,9 +367,14 @@ void CreateTransformationMatrices(void)
 	PerspModelMatrix = glm::rotate(PerspModelMatrix, glm::radians(perspRotationY), glm::vec3(0.0, 1.0, 0.0));
 	PerspModelMatrix = glm::scale(PerspModelMatrix, glm::vec3(perspZoom));
 
-	PerspectiveShader.SetUniform("projectionMatrix", glm::value_ptr(PerspProjectionMatrix), 4, GL_FALSE, 1);
+
+	/*PerspectiveShader.SetUniform("projectionMatrix", glm::value_ptr(PerspProjectionMatrix), 4, GL_FALSE, 1);
 	PerspectiveShader.SetUniform("viewMatrix", glm::value_ptr(PerspViewMatrix), 4, GL_FALSE, 1);
-	PerspectiveShader.SetUniform("modelMatrix", glm::value_ptr(PerspModelMatrix), 4, GL_FALSE, 1);
+	PerspectiveShader.SetUniform("modelMatrix", glm::value_ptr(PerspModelMatrix), 4, GL_FALSE, 1);*/
+
+	TextureShader.SetUniform("projectionMatrix", glm::value_ptr(PerspProjectionMatrix), 4, GL_FALSE, 1);
+	TextureShader.SetUniform("viewMatrix", glm::value_ptr(PerspViewMatrix), 4, GL_FALSE, 1);
+	TextureShader.SetUniform("modelMatrix", glm::value_ptr(PerspModelMatrix), 4, GL_FALSE, 1);
 
 
 }
@@ -351,9 +388,11 @@ void CreateShaders(void)
 	// Renders using perspective projection
 	PerspectiveShader.Create("./shaders/persplight.vert", "./shaders/persplight.frag");
 
+	TextureShader.Create("./shaders/texpersplight.vert", "./shaders/texpersplight.frag");
+
 	cout << "C" << endl;
 
-	
+
 
 }
 
@@ -367,12 +406,13 @@ void CreateAxisBuffers(void)
 	norms = ConstructNorms(N, M);
 	verts = constructTorus(R, r, N, M); // 1.0f, 0.1f, N, M);
 	verts_norm = ConstructNormVectors(R, r, N, M);
+	tex_coords = ConstructTexCoords(N, M);
 	//verts = generateTorusVertices( R,  r,  N,  M); 
 	vector<float> rgb;
 
 	glGenVertexArrays(1, &axis_VAO);
 	glBindVertexArray(axis_VAO);
-	glGenBuffers(3, &axis_VBO[0]);
+	glGenBuffers(4, &axis_VBO[0]);
 	glBindBuffer(GL_ARRAY_BUFFER, axis_VBO[0]);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * verts.size(), &verts[0], GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
@@ -380,8 +420,8 @@ void CreateAxisBuffers(void)
 
 	// created a vector type float rgb
 	for (auto v : verts) { // goes through the entire vector and fills
-		rgb.push_back(0.f);
-		rgb.push_back(0.2f);
+		rgb.push_back(0.5f);
+		rgb.push_back(0.5f);
 		rgb.push_back(0.5f);
 		rgb.push_back(1.f);
 
@@ -397,7 +437,13 @@ void CreateAxisBuffers(void)
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * norms.size(), &norms[0], GL_STATIC_DRAW);
 	glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray(2);
-	
+
+	glBindBuffer(GL_ARRAY_BUFFER, axis_VBO[3]);
+	// texture coordinates buffer
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * tex_coords.size(), &tex_coords[0], GL_STATIC_DRAW);
+	glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glEnableVertexAttribArray(3);
+
 	glGenVertexArrays(1, &norms_VAO);
 	glBindVertexArray(norms_VAO);
 	glGenBuffers(2, &norms_VBO[0]);
@@ -418,12 +464,7 @@ void CreateAxisBuffers(void)
 	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * rgb.size(), &rgb[0], GL_STATIC_DRAW);
 	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, (void*)0);
 	glEnableVertexAttribArray(1);
-	/*
-	glBindBuffer(GL_ARRAY_BUFFER, norms_VBO[2]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * verts_norm.size(), verts_norm.data(), GL_STATIC_DRAW);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(glm::vec2), (void*)0);
-	glEnableVertexAttribArray(2);
-	*/
+	
 	glBindVertexArray(0);
 }
 
@@ -465,6 +506,21 @@ void keyboard_func(unsigned char key, int x, int y)
 			std::cout << "Wireframes on.\n";
 		else
 			std::cout << "Wireframes off.\n";
+		break;
+	}
+	case '2':
+	{
+		g_texId = 0;
+		break;
+	}
+	case '3':
+	{
+		g_texId = 1;
+		break;
+	}
+	case '4':
+	{
+		g_texId = 2;
 		break;
 	}
 	case 'q': {
@@ -610,13 +666,16 @@ void display_func(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	PerspectiveShader.Use();
+	//PerspectiveShader.Use();
+	TextureShader.Use();
 	CreateTransformationMatrices();
 
 
 	if (draw_wireframe == true)
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+	// bind corresponding texture
+	glBindTexture(GL_TEXTURE_2D, texture[g_texId]);
 	glBindVertexArray(axis_VAO);
 	glDrawArrays(GL_TRIANGLES, 0, verts.size());
 	glBindVertexArray(0);
@@ -649,12 +708,16 @@ void init(void)
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f); // background color
 	glEnable(GL_DEPTH_TEST); // enable depth test
 	glEnable(GL_CULL_FACE); // enable back-face culling
+	glEnable(GL_TEXTURE_2D);
 
 	// Create shaders
 	CreateShaders();
 
 	// Create buffers
 	CreateAxisBuffers();
+
+	// Create Textures
+	CreateTextures();
 
 	std::cout << "Finished initializing...\n\n";
 }
